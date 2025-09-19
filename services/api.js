@@ -63,7 +63,45 @@ export const refresh = (refreshToken) =>
 export const logout = (refreshToken) =>
   api.post("api/auth/logout", { refreshToken });
 export const meAuth = (user) => api.get("api/auth/me", user);
-export const getChampion = (id) => api.get(`api/champions/${id}`);
+
+export const getChampion = async (id) => {
+  const backendResponse = await api.get(`api/champions/${id}`);
+  const backendData = backendResponse.data;
+
+  const spells = backendData.abilities
+    .filter((ability) => ability.key !== "P")
+    .map((ability) => ({
+      id: ability.id,
+      key: ability.key,
+      name: ability.name,
+      description: ability.tooltipTemplate, // Fallback for non-interactive
+      tooltip: ability.tooltipTemplate, // For parsing
+      cooldown: ability.cooldowns,
+      cost: ability.costs,
+      range: ability.ranges,
+      damageComponents: ability.damageComponents,
+      vars: ability.vars || [],
+    }));
+
+  const passive = backendData.abilities
+    .filter((ability) => ability.key === "P")
+    .map((ability) => ({
+      name: ability.name,
+      description: ability.tooltipTemplate,
+      tooltip: ability.tooltipTemplate, // For parsing
+      vars: ability.vars || [],
+      damageComponents: ability.damageComponents || [], // For parsing
+    }))[0] || { name: "", description: "", tooltip: "" };
+
+  return {
+    id: backendData.id,
+    key: backendData.id, // Adjust if Data Dragon key is needed
+    name: backendData.name,
+    // partype: "Mana", // From Data Dragon
+    spells,
+    passive,
+  };
+};
 
 export default api;
 

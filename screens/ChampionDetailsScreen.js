@@ -34,6 +34,13 @@ export default function ChampionDetailsScreen() {
   const navigation = useNavigation();
   const [isFavorite, setIsFavorite] = useState(false);
   const [champion, setChampion] = useState({});
+  const [selectedSpell, setSelectedSpell] = useState(null);
+
+  useEffect(() => {
+    if (champion && champion.spells && !selectedSpell) {
+      setSelectedSpell({ ...champion.spells[0], key: "Q" });
+    }
+  }, [champion, selectedSpell]);
 
   useLayoutEffect(() => {
     getChampionDetails(champ?.id);
@@ -44,6 +51,10 @@ export default function ChampionDetailsScreen() {
     if (response && response.data) {
       setChampion(response.data[champ?.id]);
     }
+  };
+
+  const handleSpellSelect = (spell, key) => {
+    setSelectedSpell({ ...spell, key });
   };
 
   return (
@@ -149,7 +160,12 @@ export default function ChampionDetailsScreen() {
           className="mx-6 my-3 h-0.5 rounded-full"
           style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
         ></View>
-        <ChampionSkills champion={champion} isInteractive={false} />
+        <ChampionSkills
+          champion={champion}
+          isInteractive={false}
+          selectedSpell={selectedSpell}
+          onSpellSelect={handleSpellSelect}
+        />
         <View className="w-full items-center justify-center">
           <Button
             onPress={() => navigation.navigate("ChampionStats", champion)}

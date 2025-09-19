@@ -17,6 +17,7 @@ import ChampionSkills from "../components/ChampionSkills";
 import ChampionStats from "../components/ChampionStats";
 import ChampionInfo from "../components/ChampionInfo";
 import LevelManager from "../components/LevelManager";
+import { getChampion } from "../services/api";
 
 const { width, height } = Dimensions.get("window");
 const ios = Platform.OS === "ios";
@@ -29,6 +30,8 @@ export default function ChampionStatsScreen({ route }) {
   const [level, setLevel] = useState(1);
   const [skillLevels, setSkillLevels] = useState({ Q: 0, W: 0, E: 0, R: 0 });
   const [stats, setStats] = useState(champion.stats);
+  const [abilities, setAbilities] = useState(null);
+  const [selectedSpell, setSelectedSpell] = useState(null);
 
   const totalSkillPointsSpent = Object.values(skillLevels).reduce(
     (a, b) => a + b,
@@ -60,6 +63,24 @@ export default function ChampionStatsScreen({ route }) {
     };
     setStats(calculatedStats);
   }, [level, champion.stats]);
+
+  useEffect(() => {
+    if (champion && champion.spells && !selectedSpell) {
+      setSelectedSpell({ ...champion.spells[0], key: "Q" });
+    }
+  }, [champion, selectedSpell]);
+
+  useEffect(() => {
+    const fetchChampion = async () => {
+      try {
+        const championData = await getChampion(champion.id); // API call
+        setAbilities(championData.spells);
+      } catch (error) {
+        console.error("Failed to fetch champion:", error);
+      }
+    };
+    fetchChampion();
+  }, [champion]);
 
   const handleLevelUp = () => {
     if (level < 18) {
@@ -124,6 +145,19 @@ export default function ChampionStatsScreen({ route }) {
     setSkillLevels((prev) => ({ ...prev, [skill]: prev[skill] + 1 }));
   };
 
+  const handleSpellSelect = (spell, key) => {
+    setSelectedSpell({ ...spell, key });
+  };
+
+  const damageComponent =
+    abilities && selectedSpell
+      ? abilities.find((ability) => ability.id === selectedSpell.id)
+      : null;
+
+  const passiveComponent = abilities
+    ? abilities.find((ability) => ability.key === "P")
+    : null;
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: COLORS.background }}
@@ -173,6 +207,11 @@ export default function ChampionStatsScreen({ route }) {
         isInteractive={true}
         level={level}
         availableSkillPoints={availableSkillPoints}
+        stats={stats}
+        selectedSpell={selectedSpell}
+        onSpellSelect={handleSpellSelect}
+        damageComponent={damageComponent}
+        passiveComponent={passiveComponent}
       />
     </ScrollView>
   );
