@@ -31,6 +31,8 @@ import {
 } from "../redux/features/auth/authSlice";
 import { UserCircleIcon } from "react-native-heroicons/outline";
 import ChampionStatsScreen from "../screens/ChampionStatsScreen";
+import BuilderListScreen from "../screens/BuilderListScreen";
+import BuilderScreen from "../screens/BuilderScreen";
 
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -50,6 +52,18 @@ const ItemStack = () => {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Items" component={ItemsScreen} />
       <Stack.Screen name="ItemDetails" component={ItemDetailsScreen} />
+    </Stack.Navigator>
+  );
+};
+
+const BuilderStack = () => {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="BuilderList" component={BuilderListScreen} />
+      <Stack.Screen name="Builder" component={BuilderScreen} />
+      <Stack.Screen name="Champions" component={Champions} />
+      <Stack.Screen name="ChampionDetails" component={ChampionDetailsScreen} />
+      <Stack.Screen name="ChampionStats" component={ChampionStatsScreen} />
     </Stack.Navigator>
   );
 };
@@ -170,6 +184,11 @@ export default function AppNavigation() {
           name="ItemsDrawer"
           options={{ title: "Items" }}
           component={ItemStack}
+        />
+        <Drawer.Screen
+          name="Builder"
+          options={{ title: "Builder" }}
+          component={BuilderStack}
         />
         <Drawer.Screen
           name="Login"

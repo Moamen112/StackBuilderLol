@@ -59,24 +59,27 @@ const stripHtmlTags = (text) => {
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
 
-  // Step 2: Replace HTML tags with visual icons (mapped to colors in React Native)
+  // Step 2: Replace HTML tags with visual icons or markers for styling
   decoded = decoded
-    .replace(/<magicDamage>/g, "⚡") // Magic damage - Blue
-    .replace(/<\/magicDamage>/g, "⚡")
-    .replace(/<shield>/g, "🛡️") // Shield - Green
-    .replace(/<\/shield>/g, "🛡️")
-    .replace(/<speed>/g, "💨") // Movement speed - Cyan
-    .replace(/<\/speed>/g, "💨")
-    .replace(/<attackSpeed>/g, "⚔️") // Attack speed - Amber
-    .replace(/<\/attackSpeed>/g, "⚔️")
-    .replace(/<scaleAP>/g, "🔮") // AP scaling - Purple
-    .replace(/<\/scaleAP>/g, "🔮")
-    .replace(/<spellPassive>/g, "🌟") // Passive - Yellow
-    .replace(/<\/spellPassive>/g, "🌟")
-    .replace(/<spellName>/g, "📜") // Spell names - Orange
-    .replace(/<\/spellName>/g, "📜")
-    .replace(/<recast>/g, "🔄") // Recast - Gray
-    .replace(/<\/recast>/g, "🔄")
+    // Tags to be styled with a background in the UI
+    .replace(/<magicDamage>/g, "__HIGHLIGHT:MAGIC__")
+    .replace(/<\/magicDamage>/g, "__HIGHLIGHT:END__")
+    .replace(/<shield>/g, "__HIGHLIGHT:SHIELD__")
+    .replace(/<\/shield>/g, "__HIGHLIGHT:END__")
+    .replace(/<speed>/g, "__HIGHLIGHT:SPEED__")
+    .replace(/<\/speed>/g, "__HIGHLIGHT:END__")
+    .replace(/<attackSpeed>/g, "__HIGHLIGHT:ATTACK_SPEED__")
+    .replace(/<\/attackSpeed>/g, "__HIGHLIGHT:END__")
+    .replace(/<scaleAP>/g, "__HIGHLIGHT:AP__")
+    .replace(/<\/scaleAP>/g, "__HIGHLIGHT:END__")
+
+    // Tags to be replaced with a simple icon
+    .replace(/<spellPassive>/g, "")
+    .replace(/<\/spellPassive>/g, " 🌟")
+    .replace(/<spellName>/g, "")
+    .replace(/<\/spellName>/g, " 📜")
+    .replace(/<recast>/g, "")
+    .replace(/<\/recast>/g, " 🔄")
 
     // ADD NEW ICON MAPPINGS HERE:
     // .replace(/<physicalDamage>/g, '🔥')     // Physical damage - Red
@@ -158,10 +161,16 @@ export const parseTooltip = (
       // Always check vars array first as it contains pre-calculated values
       const varData = vars.find((v) => v.key === key);
       if (varData && varData.coeff !== undefined) {
-        const coeff = Array.isArray(varData.coeff)
-          ? (varData.coeff[level - 1] ?? varData.coeff[0] ?? 0)
-          : varData.coeff;
-        baseValue = coeff;
+        if (Array.isArray(varData.coeff)) {
+          // Handle level 0/1 mapping to index 0 and clamp to the array's max index
+          const levelIndex = Math.min(
+            Math.max(0, level - 1),
+            varData.coeff.length - 1
+          );
+          baseValue = varData.coeff[levelIndex] ?? 0;
+        } else {
+          baseValue = varData.coeff;
+        }
         foundValue = true;
       }
 
@@ -375,10 +384,17 @@ export const parseTooltip = (
       // RETURN FORMATTED VALUE
       // =====================================
       if (foundValue && baseValue !== null) {
-        const formattedValue = Math.round(baseValue);
+        // Convert to string to check for existing symbols and handle non-numeric values
+        const valueStr = baseValue.toString();
+        let formattedValue =
+          typeof baseValue === "number"
+            ? Math.round(baseValue)
+            : valueStr.trim();
 
         // Special formatting based on key patterns
         if (key.includes("percent") || key.includes("Percent")) {
+          // Clean the value of any existing '%' and then append one for consistency
+          formattedValue = formattedValue.toString().replace(/%/g, "");
           return `${formattedValue}%`;
         }
 
@@ -387,6 +403,8 @@ export const parseTooltip = (
           key.includes("lifetime") ||
           key.includes("time")
         ) {
+          // Clean the value of any existing 's' and then append one
+          formattedValue = formattedValue.toString().replace(/s/g, "");
           return `${formattedValue}s`;
         }
 
@@ -417,6 +435,8 @@ export const parseTooltip = (
     .replace(/\n\s*\n/g, "\n\n") // Normalize double line breaks
     .replace(/\s+/g, " ") // Normalize spaces
     .replace(/\n /g, "\n") // Remove spaces after line breaks
+    .replace(/(\d+(?:\.\d+)?)s seconds/g, "$1s") // Removes redundant "seconds" after "Xs"
+    .replace(/(\d+)%%/g, "$1%") // Corrects duplicate percentage signs
     .trim();
 
   return parsedTooltip;

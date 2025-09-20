@@ -20,94 +20,134 @@ import { parseTooltip } from "../utils/toolParserV3";
 const EnhancedTooltip = ({ tooltip }) => {
   if (!tooltip) return null;
 
-  // Split tooltip into segments based on icons and special formatting
-  const renderTooltipText = (text) => {
-    const segments = [];
-    let currentIndex = 0;
+  // 1. Define styles and icons for different highlight types
+  const typeMap = {
+    MAGIC: {
+      style: styles.magicHighlight,
+      textStyle: styles.magicHighlightText,
+      icon: "⚡",
+    },
+    SHIELD: {
+      style: styles.shieldHighlight,
+      textStyle: styles.shieldHighlightText,
+      icon: "🛡️",
+    },
+    SPEED: {
+      style: styles.speedHighlight,
+      textStyle: styles.speedHighlightText,
+      icon: "💨",
+    },
+    ATTACK_SPEED: {
+      style: styles.attackSpeedHighlight,
+      textStyle: styles.attackSpeedHighlightText,
+      icon: "⚔️",
+    },
+    AP: {
+      style: styles.apHighlight,
+      textStyle: styles.apHighlightText,
+      icon: "🔮",
+    },
+  };
 
-    // Define icon mappings with colors
-    const iconMap = {
-      "⚡": { color: "#3b82f6", label: "Magic Damage" }, // Blue for magic damage
-      "🛡️": { color: "#10b981", label: "Shield" }, // Green for shield
-      "💨": { color: "#06b6d4", label: "Move Speed" }, // Cyan for speed
-      "⚔️": { color: "#f59e0b", label: "Attack Speed" }, // Amber for attack speed
-      "🔮": { color: "#8b5cf6", label: "AP Scaling" }, // Purple for AP
-      "🌟": { color: "#fbbf24", label: "Passive" }, // Yellow for passive
-      "📜": { color: "#f97316", label: "Spell" }, // Orange for spell names
-      "🔄": { color: "#6b7280", label: "Recast" }, // Gray for recast
-    };
+  // 2. Helper to render a highlighted segment with the icon after the number
+  const renderHighlightedSegment = (text, type, keyPrefix) => {
+    const typeInfo = typeMap[type];
+    const numberRegex = /(\d+(?:\.\d+)?(?:%|s)?)/;
+    const match = text.match(numberRegex);
 
-    // Split by lines first
-    const lines = text.split("\n");
+    // Fallback for text without a number
+    if (!match) {
+      return (
+        <View key={keyPrefix} style={[styles.highlightContainer, typeInfo.style]}>
+          <Text style={[styles.tooltipText, styles.highlightedText, typeInfo.textStyle]}>
+            {text}
+          </Text>
+          <Text style={styles.iconText}>{typeInfo.icon}</Text>
+        </View>
+      );
+    }
 
+    const numberValue = match[0];
+    const parts = text.split(numberValue);
+    const beforeText = parts[0];
+    const afterText = parts.slice(1).join(numberValue);
+
+    const isPercentage = numberValue.includes("%");
+    const isDuration = numberValue.includes("s");
+
+    return (
+      <View key={keyPrefix} style={[styles.highlightContainer, typeInfo.style]}>
+        {beforeText ? (
+          <Text style={[styles.tooltipText, styles.highlightedText, typeInfo.textStyle]}>
+            {beforeText}
+          </Text>
+        ) : null}
+        <Text
+          style={[
+            styles.highlightedNumber,
+            isPercentage && styles.percentageNumber,
+            isDuration && styles.durationNumber,
+            typeInfo.textStyle, // Apply type-specific color
+          ]}
+        >
+          {numberValue}
+        </Text>
+        <Text style={styles.iconText}>{typeInfo.icon}</Text>
+        {afterText ? (
+          <Text style={[styles.tooltipText, styles.highlightedText, typeInfo.textStyle]}>
+            {` ${afterText}`}
+          </Text>
+        ) : null}
+      </View>
+    );
+  };
+
+  // 3. Main render function to process the tooltip string with markers
+  const renderTooltip = () => {
+    const lines = tooltip.split("\n");
     return lines.map((line, lineIndex) => {
-      if (!line.trim())
-        return <View key={lineIndex} style={styles.lineBreak} />;
+      if (!line.trim()) return <View key={lineIndex} style={styles.lineBreak} />;
 
-      const parts = [];
-      let remaining = line;
-      let partIndex = 0;
+      const segments = line.split(/(__HIGHLIGHT:(?:[A-Z_]+|END)__)/g);
+      const renderedLine = [];
+      let highlightType = null;
 
-      // Find numbers (damage values, percentages, etc.)
-      const numberRegex = /(\d+(?:\.\d+)?(?:%|s)?)/g;
-      let match;
-      let lastIndex = 0;
-
-      while ((match = numberRegex.exec(remaining)) !== null) {
-        // Add text before the number
-        if (match.index > lastIndex) {
-          const textBefore = remaining.substring(lastIndex, match.index);
-          parts.push(
-            <Text key={`text-${partIndex}`} style={styles.tooltipText}>
-              {textBefore}
-            </Text>
-          );
-          partIndex++;
+      segments.forEach((segment, segmentIndex) => {
+        if (segment.startsWith("__HIGHLIGHT:")) {
+          if (segment.includes("END")) {
+            highlightType = null;
+          } else {
+            highlightType = segment.replace("__HIGHLIGHT:", "").replace("__", "");
+          }
+        } else if (segment) {
+          if (highlightType && typeMap[highlightType]) {
+            renderedLine.push(
+              renderHighlightedSegment(
+                segment,
+                highlightType,
+                `${lineIndex}-${segmentIndex}`
+              )
+            );
+          } else {
+            renderedLine.push(
+              <Text key={segmentIndex} style={styles.tooltipText}>
+                {segment}
+              </Text>
+            );
+          }
         }
-
-        // Add the highlighted number
-        const numberValue = match[1];
-        const isPercentage = numberValue.includes("%");
-        const isDuration = numberValue.includes("s");
-
-        parts.push(
-          <Text
-            key={`number-${partIndex}`}
-            style={[
-              styles.highlightedNumber,
-              isPercentage && styles.percentageNumber,
-              isDuration && styles.durationNumber,
-            ]}
-          >
-            {numberValue}
-          </Text>
-        );
-        partIndex++;
-        lastIndex = numberRegex.lastIndex;
-      }
-
-      // Add remaining text
-      if (lastIndex < remaining.length) {
-        const remainingText = remaining.substring(lastIndex);
-        parts.push(
-          <Text key={`text-${partIndex}`} style={styles.tooltipText}>
-            {remainingText}
-          </Text>
-        );
-      }
+      });
 
       return (
         <View key={lineIndex} style={styles.tooltipLine}>
-          {parts}
+          {renderedLine}
         </View>
       );
     });
   };
 
   return (
-    <View style={styles.enhancedTooltipContainer}>
-      {renderTooltipText(tooltip)}
-    </View>
+    <View style={styles.enhancedTooltipContainer}>{renderTooltip()}</View>
   );
 };
 
@@ -178,7 +218,7 @@ export default function ChampionSkills({
           damageComponent.tooltip, // Use tooltipTemplate instead of tooltip
           damageComponent,
           damageComponent.vars || [],
-          skillLevels[selectedSpell.key] + 1,
+          skillLevels[selectedSpell.key],
           transformedStats
         )
       : selectedSpell?.description || "";
@@ -305,13 +345,13 @@ export default function ChampionSkills({
 const styles = StyleSheet.create({
   container: { marginHorizontal: 24, marginBottom: 20 },
   title: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
     color: COLORS.textSecondary,
     marginBottom: 20,
     textAlign: "center",
     textTransform: "uppercase",
-    letterSpacing: 1.5,
+    letterSpacing: 2,
   },
   skillsContainer: { flexDirection: "row", gap: 16, paddingHorizontal: 4 },
   skillWrapper: { alignItems: "center", gap: 8 },
@@ -324,85 +364,139 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.2)",
   },
-  selectedSkill: { borderColor: COLORS.border },
+  selectedSkill: {
+    borderColor: COLORS.secondary,
+    borderWidth: 3,
+    shadowColor: COLORS.secondary,
+    shadowRadius: 8,
+    shadowOpacity: 0.7,
+  },
   skillImage: { width: "100%", height: "100%" },
   levelIndicator: {
     position: "absolute",
     bottom: -2,
     right: -2,
-    backgroundColor: "rgba(0,0,0,0.8)",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    backgroundColor: "rgba(0,0,0,0.9)",
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
     borderWidth: 1,
     borderColor: COLORS.secondary,
   },
   levelText: { color: "white", fontWeight: "bold", fontSize: 12 },
   levelUpButton: { marginTop: 4 },
-  detailsContainer: { alignItems: "center", gap: 16, padding: 16 },
+  detailsContainer: {
+    alignItems: "center",
+    gap: 16,
+    padding: 16,
+    marginTop: 20,
+    backgroundColor: COLORS.backgroundCard,
+    borderRadius: 12,
+  },
   spellHeader: {
     alignItems: "center",
     gap: 4,
+    marginBottom: 8,
   },
   spellName: {
     fontSize: 24,
     color: TEXT_COLORS.secondary,
     fontWeight: "bold",
+    textAlign: "center",
   },
   spellLevel: {
     fontSize: 14,
     color: COLORS.textSecondary,
     opacity: 0.8,
   },
-  videoPlayer: { width: "100%", height: 200, marginTop: 8 },
+  videoPlayer: { width: "100%", height: 200, marginTop: 8, borderRadius: 12 },
   upgradeIndicator: {
     position: "absolute",
     width: "100%",
     height: "100%",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.6)",
     justifyContent: "center",
     alignItems: "center",
+    borderRadius: 10,
   },
 
   // Enhanced Tooltip Styles
   enhancedTooltipContainer: {
-    backgroundColor: COLORS.backgroundCard,
-    borderRadius: 12,
-    paddingVertical: 16,
     width: "100%",
   },
   tooltipLine: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginBottom: 4,
-    alignItems: "baseline",
+    marginBottom: 8,
+    alignItems: "center",
   },
   tooltipText: {
     color: "#d1d5db",
-    fontSize: 14,
-    lineHeight: 20,
-    flexShrink: 1,
+    fontSize: 15,
+    lineHeight: 24,
   },
   lineBreak: {
-    height: 8,
+    height: 1,
+    width: "90%",
+    alignSelf: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    marginVertical: 10,
+  },
+  highlightContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginHorizontal: 2,
+  },
+  iconText: {
+    fontSize: 14,
+    marginLeft: 3,
+  },
+  highlightedText: {
+    fontWeight: "500",
+  },
+  magicHighlight: {
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
+  },
+  magicHighlightText: {
+    color: "#c084fc",
+  },
+  shieldHighlight: {
+    backgroundColor: "rgba(16, 185, 129, 0.2)",
+  },
+  shieldHighlightText: {
+    color: "#34d399",
+  },
+  speedHighlight: {
+    backgroundColor: "rgba(6, 182, 212, 0.2)",
+  },
+  speedHighlightText: {
+    color: "#22d3ee",
+  },
+  attackSpeedHighlight: {
+    backgroundColor: "rgba(245, 158, 11, 0.2)",
+  },
+  attackSpeedHighlightText: {
+    color: "#f59e0b",
+  },
+  apHighlight: {
+    backgroundColor: "rgba(139, 92, 246, 0.2)",
+  },
+  apHighlightText: {
+    color: "#c084fc",
   },
   highlightedNumber: {
-    color: "#fff",
     fontWeight: "bold",
     fontSize: 16,
-    backgroundColor: "rgba(59, 130, 246, 0.2)",
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
-    overflow: "hidden",
   },
   percentageNumber: {
-    backgroundColor: "rgba(168, 85, 247, 0.2)",
     color: "#c084fc",
   },
   durationNumber: {
-    backgroundColor: "rgba(6, 182, 212, 0.2)",
-    color: "#67e8f9",
+    color: "#60a5fa",
   },
 });
